@@ -7,12 +7,12 @@ const App: React.FC = () => {
   const [currentHtml, setCurrentHtml] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const visualEditorRef = useRef<HTMLDivElement>(null);
-  const skipSync = useRef(false);
+  const isInternalChange = useRef(false);
 
-  // Sync Visual Editor when state changes
+  // Sync Visual Editor ONLY when currentHtml changes from the code editor or cleaning action
   useEffect(() => {
-    if (skipSync.current) {
-      skipSync.current = false;
+    if (isInternalChange.current) {
+      isInternalChange.current = false;
       return;
     }
     if (visualEditorRef.current && visualEditorRef.current.innerHTML !== currentHtml) {
@@ -20,12 +20,16 @@ const App: React.FC = () => {
     }
   }, [currentHtml]);
 
-  const handleVisualInput = () => {
+  const updateStateFromVisual = () => {
     if (visualEditorRef.current) {
       const html = visualEditorRef.current.innerHTML;
-      skipSync.current = true;
+      isInternalChange.current = true;
       setCurrentHtml(html);
     }
+  };
+
+  const handleVisualInput = () => {
+    updateStateFromVisual();
   };
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -35,7 +39,6 @@ const App: React.FC = () => {
   const handleSanitize = () => {
     const sanitized = cleanHTML(currentHtml);
     setCurrentHtml(sanitized);
-    // After cleaning, force update visual editor to match the sanitized state
     if (visualEditorRef.current) {
       visualEditorRef.current.innerHTML = sanitized;
     }
@@ -43,34 +46,29 @@ const App: React.FC = () => {
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const html = e.clipboardData.getData('text/html') || e.clipboardData.getData('text/plain');
+    const html = e.clipboardData.getData('text/html');
+    const plain = e.clipboardData.getData('text/plain');
     
-    // Immediate cleaning on paste
-    const sanitized = cleanHTML(html);
+    // If there is HTML (like from Word/Docs), clean it first
+    const contentToPaste = html ? cleanHTML(html) : plain;
     
-    // Insert into visual editor at cursor
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       range.deleteContents();
       
-      const div = document.createElement('div');
-      div.innerHTML = sanitized;
-      const frag = document.createDocumentFragment();
-      while (div.firstChild) {
-        frag.appendChild(div.firstChild);
-      }
-      range.insertNode(frag);
+      const fragment = range.createContextualFragment(contentToPaste);
+      range.insertNode(fragment);
       
-      // Move cursor to end of inserted content
+      // Move cursor after the pasted content
       range.collapse(false);
       selection.removeAllRanges();
       selection.addRange(range);
     } else if (visualEditorRef.current) {
-      visualEditorRef.current.innerHTML += sanitized;
+      visualEditorRef.current.innerHTML += contentToPaste;
     }
     
-    handleVisualInput();
+    updateStateFromVisual();
   };
 
   const copyToClipboard = async () => {
@@ -84,7 +82,7 @@ const App: React.FC = () => {
   };
 
   const clearAll = () => {
-    if (confirm("Clear all content?")) {
+    if (currentHtml && confirm("Clear all content?")) {
       setCurrentHtml('');
       if (visualEditorRef.current) visualEditorRef.current.innerHTML = '';
     }
@@ -99,7 +97,7 @@ const App: React.FC = () => {
           <button 
             onClick={handleSanitize}
             className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold hover:bg-slate-800 transition-all shadow-md active:scale-95"
-            title="Clean formatting and attributes"
+            title="Remove junk tags and attributes"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -118,7 +116,8 @@ const App: React.FC = () => {
         <div className="flex items-center gap-3">
           <button 
             onClick={copyToClipboard}
-            className={`flex items-center gap-2 px-6 py-2 text-sm font-bold rounded-lg transition-all border shadow-sm active:scale-95 ${
+            disabled={!currentHtml}
+            className={`flex items-center gap-2 px-6 py-2 text-sm font-bold rounded-lg transition-all border shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
               isCopied ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
           >
@@ -145,8 +144,8 @@ const App: React.FC = () => {
         {/* Left Pane: Visual Editor */}
         <div className="flex-1 flex flex-col border-r border-slate-200 min-w-0">
           <div className="bg-slate-50 px-4 py-1.5 border-b border-slate-200 flex justify-between items-center">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Visual Editor / Document Preview</span>
-            <span className="text-[9px] text-slate-300 font-bold">PASTE WORD/DOCS CONTENT HERE</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Visual Editor</span>
+            <span className="text-[9px] text-slate-300 font-bold">PASTE FROM WORD/DOCS</span>
           </div>
           <div 
             ref={visualEditorRef}
@@ -162,16 +161,15 @@ const App: React.FC = () => {
         {/* Right Pane: HTML Code Editor */}
         <div className="flex-1 flex flex-col bg-slate-900 min-w-0">
           <div className="bg-slate-800 px-4 py-1.5 border-b border-slate-700 flex justify-between items-center">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Clean HTML Source Code</span>
-            <span className="text-[9px] text-slate-600 font-bold">READ-ONLY OUTPUT</span>
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">HTML Output</span>
+            <span className="text-[9px] text-slate-600 font-bold">CLEAN SEMANTIC CODE</span>
           </div>
           <textarea
             value={currentHtml}
             onChange={handleCodeChange}
             spellCheck={false}
-            autoComplete="off"
-            className="flex-1 p-8 code-font text-xs sm:text-sm bg-transparent text-slate-300 resize-none outline-none leading-relaxed focus:ring-0 placeholder-slate-700 selection:bg-slate-700"
-            placeholder="Cleaned HTML will automatically appear here..."
+            className="flex-1 p-8 code-font text-xs sm:text-sm bg-transparent text-slate-300 resize-none outline-none leading-relaxed focus:ring-0 placeholder-slate-700"
+            placeholder="Cleaned HTML source code will appear here..."
           />
         </div>
       </main>
@@ -180,12 +178,12 @@ const App: React.FC = () => {
         <div className="flex gap-4">
           <div className="flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-            <span>System: Active</span>
+            <span>Status: Ready</span>
           </div>
-          <span>Mode: Semantic Strict</span>
+          <span>Mode: Semantic Purifier</span>
         </div>
         <div className="hidden sm:block">
-          All processing is performed locally in your browser
+          Optimized for GitHub Pages deployment
         </div>
       </footer>
     </div>
