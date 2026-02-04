@@ -9,13 +9,46 @@ const TAG_MAP: Record<string, string> = {
 };
 
 /**
+ * Форматирует HTML строку с правильными отступами
+ */
+const beautifyHTML = (html: string): string => {
+  let formatted = '';
+  let indent = '';
+  const tab = '  '; // 2 пробела
+
+  // Разбиваем на теги и текст
+  const parts = html.split(/(<\/?[^>]+>)/g);
+
+  parts.forEach((part) => {
+    if (!part.trim()) return;
+
+    if (part.match(/^<[^/]/)) {
+      // Открывающий тег
+      formatted += indent + part + '\n';
+      // Если это не самозакрывающийся тег и не BR, увеличиваем отступ
+      if (!part.match(/\/>/) && !part.match(/<br/i)) {
+        indent += tab;
+      }
+    } else if (part.match(/^<\//)) {
+      // Закрывающий тег
+      indent = indent.substring(0, indent.length - tab.length);
+      formatted += indent + part + '\n';
+    } else {
+      // Текст
+      formatted += indent + part.trim() + '\n';
+    }
+  });
+
+  return formatted.trim();
+};
+
+/**
  * Очищает HTML от мусорных тегов и атрибутов, соблюдая семантику.
  */
 export const cleanHTML = (rawHtml: string): string => {
   if (!rawHtml) return '';
 
   const parser = new DOMParser();
-  // Предварительная очистка
   const preCleaned = rawHtml
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -26,23 +59,18 @@ export const cleanHTML = (rawHtml: string): string => {
   const body = doc.body;
 
   const processNode = (node: Node): Node | Node[] | null => {
-    // 1. Текстовые узлы
     if (node.nodeType === Node.TEXT_NODE) {
       const text = node.textContent || '';
-      // Сохраняем только значащие пробелы
       if (text.trim() === '' && text.includes('\n')) return null;
-      return document.createTextNode(text);
+      return document.createTextNode(text.replace(/\s+/g, ' ')); // Схлопываем лишние пробелы в тексте
     }
 
-    // 2. Элементы
     if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement;
       let tagName = el.tagName.toUpperCase();
 
-      // Пропуск Word-специфичных тегов и скриптов
       if (tagName.startsWith('O:') || tagName === 'SCRIPT' || tagName === 'STYLE' || tagName === 'XML') return null;
 
-      // Удаляем SPAN сразу, возвращая только его обработанных детей
       if (tagName === 'SPAN') {
         const children: Node[] = [];
         el.childNodes.forEach(child => {
@@ -53,7 +81,6 @@ export const cleanHTML = (rawHtml: string): string => {
         return children;
       }
 
-      // Маппинг тегов (B -> STRONG и т.д.)
       if (TAG_MAP[tagName]) tagName = TAG_MAP[tagName];
 
       if (ALLOWED_TAGS.has(tagName)) {
@@ -64,7 +91,6 @@ export const cleanHTML = (rawHtml: string): string => {
           else if (processed) children.push(processed);
         });
 
-        // Проверка на пустоту (кроме BR и ячеек таблиц)
         const hasVisibleContent = children.some(c => 
           (c.nodeType === Node.TEXT_NODE && c.textContent?.trim() !== '') || 
           (c.nodeType === Node.ELEMENT_NODE)
@@ -72,18 +98,15 @@ export const cleanHTML = (rawHtml: string): string => {
 
         if (!hasVisibleContent && !['BR', 'TD', 'TH'].includes(tagName)) return null;
 
-        // ЛОГИКА: Инлайны (STRONG, EM, A) не могут содержать блочные теги
         const containsBlock = children.some(c => c.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has((c as HTMLElement).tagName));
         if (INLINE_TAGS.has(tagName) && containsBlock) {
-          return children; // Разворачиваем инлайн (убираем strong/em/a), оставляя только содержимое
+          return children;
         }
 
-        // Удаляем STRONG/EM внутри заголовков (H1-H6 уже стилизованы)
         if (tagName.match(/^H[1-6]$/)) {
             const cleanedChildren: Node[] = [];
             children.forEach(child => {
                 if (child.nodeType === Node.ELEMENT_NODE && (child as HTMLElement).tagName === 'STRONG') {
-                    // Вытаскиваем текст из STRONG внутри заголовка
                     child.childNodes.forEach(c => cleanedChildren.push(c.cloneNode(true)));
                 } else {
                     cleanedChildren.push(child);
@@ -94,7 +117,6 @@ export const cleanHTML = (rawHtml: string): string => {
 
         return createCleanElement(tagName, children, el);
       } else {
-        // Если тег не в списке разрешенных — просто вытаскиваем его детей наружу (unwrap)
         const children: Node[] = [];
         el.childNodes.forEach(child => {
           const processed = processNode(child);
@@ -104,13 +126,11 @@ export const cleanHTML = (rawHtml: string): string => {
         return children;
       }
     }
-
     return null;
   };
 
   function createCleanElement(tag: string, children: Node[], originalEl?: HTMLElement): HTMLElement {
     const newEl = document.createElement(tag);
-    // Сохраняем только HREF для ссылок
     if (tag === 'A' && originalEl?.hasAttribute('href')) {
       newEl.setAttribute('href', originalEl.getAttribute('href') || '#');
       newEl.setAttribute('target', '_blank');
@@ -130,16 +150,14 @@ export const cleanHTML = (rawHtml: string): string => {
   const container = document.createElement('div');
   container.appendChild(resultFragment);
 
-  return formatHTML(container.innerHTML);
-};
-
-function formatHTML(html: string): string {
-  return html
+  const cleanRawHtml = container.innerHTML
     .replace(/&nbsp;/g, ' ')
-    .replace(/>\s+</g, '><') // Убираем лишние пробелы между тегами
-    .replace(/(<br\s*\/?>){3,}/gi, '<br><br>') // Не более 2 BR подряд
-    .replace(/<p>\s*<\/p>/gi, '') // Удаляем пустые параграфы
-    .replace(/<strong>\s*<\/strong>/gi, '') // Удаляем пустые strong
-    .replace(/<em>\s*<\/em>/gi, '') // Удаляем пустые em
+    .replace(/>\s+</g, '><') 
+    .replace(/(<br\s*\/?>){3,}/gi, '<br><br>') 
+    .replace(/<p>\s*<\/p>/gi, '') 
+    .replace(/<strong>\s*<\/strong>/gi, '') 
+    .replace(/<em>\s*<\/em>/gi, '')
     .trim();
-}
+
+  return beautifyHTML(cleanRawHtml);
+};
