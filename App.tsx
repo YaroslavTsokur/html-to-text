@@ -4,9 +4,15 @@ import { cleanHTML } from './services/sanitizer';
 
 type RightPanelMode = 'html' | 'seo';
 
+interface HeadingItem {
+  tag: string;
+  text: string;
+  level: number;
+}
+
 interface SEOStats {
   title: string;
-  description: string;
+  headingList: HeadingItem[];
   wordCount: number;
   charCount: number;
   headings: { [key: string]: number };
@@ -75,12 +81,19 @@ const App: React.FC = () => {
     const doc = parser.parseFromString(currentHtml, 'text/html');
     
     const h1 = doc.querySelector('h1')?.textContent || '';
-    const firstP = doc.querySelector('p')?.textContent || '';
     const textContent = doc.body.textContent || '';
     
     const headings: { [key: string]: number } = { h1: 0, h2: 0, h3: 0, h4: 0 };
+    const headingList: HeadingItem[] = [];
+
     doc.querySelectorAll('h1, h2, h3, h4').forEach(h => {
-      headings[h.tagName.toLowerCase()]++;
+      const tag = h.tagName.toLowerCase();
+      headings[tag]++;
+      headingList.push({
+        tag: tag.toUpperCase(),
+        text: h.textContent || '',
+        level: parseInt(tag.substring(1))
+      });
     });
 
     const imgs = doc.querySelectorAll('img');
@@ -89,7 +102,7 @@ const App: React.FC = () => {
 
     return {
       title: h1,
-      description: firstP.length > 160 ? firstP.substring(0, 157) + '...' : firstP,
+      headingList,
       wordCount: textContent.split(/\s+/).filter(w => w.length > 0).length,
       charCount: textContent.length,
       headings,
@@ -251,9 +264,35 @@ const App: React.FC = () => {
                 </section>
 
                 <section>
-                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2 block">Meta Description (First P)</label>
-                  <div className={`p-3 rounded border ${seoData.description ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-orange-900/20 border-orange-900/40 text-orange-400'}`}>
-                    {seoData.description || 'Description Missing!'}
+                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2 block">Meta tags (Headings Structure)</label>
+                  <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+                    {seoData.headingList.length > 0 ? (
+                      <div className="p-1 space-y-0.5 max-h-[400px] overflow-auto">
+                        {seoData.headingList.map((h, idx) => (
+                          <div 
+                            key={idx} 
+                            style={{ paddingLeft: `${(h.level - 1) * 16}px` }}
+                            className="flex items-baseline gap-2 py-1.5 px-3 hover:bg-slate-700/30 rounded group transition-colors"
+                          >
+                            <span className={`text-[9px] font-black code-font px-1.5 py-0.5 rounded leading-none min-w-[32px] text-center ${
+                              h.level === 1 ? 'bg-blue-500/20 text-blue-400' : 
+                              h.level === 2 ? 'bg-emerald-500/20 text-emerald-400' : 
+                              h.level === 3 ? 'bg-orange-500/20 text-orange-400' : 
+                              'bg-slate-600/30 text-slate-400'
+                            }`}>
+                              &lt;{h.tag}&gt;
+                            </span>
+                            <span className={`text-xs leading-tight ${h.level === 1 ? 'font-bold text-white' : 'text-slate-300'}`}>
+                              {h.text}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 text-xs text-slate-500 italic text-center">
+                        No headings found in content
+                      </div>
+                    )}
                   </div>
                 </section>
 
@@ -269,7 +308,7 @@ const App: React.FC = () => {
                 </div>
 
                 <section className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-3 block">Heading Structure</label>
+                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-3 block">Heading Counts</label>
                   <div className="flex justify-between items-center text-xs">
                     {Object.entries(seoData.headings).map(([tag, count]) => (
                       <div key={tag} className="flex flex-col items-center">
