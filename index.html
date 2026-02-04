@@ -5,9 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pixana - Clean Document HTML</title>
-    <!-- Using the standard Play CDN for Tailwind -->
+    <!-- Tailwind Play CDN (fine for utility tools) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
     <style>
         body { font-family: 'Inter', sans-serif; overflow: hidden; height: 100vh; margin: 0; }
         .code-font { font-family: 'Fira Code', monospace; }
@@ -16,14 +17,12 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
-        /* Strict Semantic Styling for Visual Editor */
+        /* Visual Editor Styling */
         .visual-editor-container {
             line-height: 1.6;
             color: #334155;
             outline: none;
         }
-        
-        /* Typography overrides for the preview area */
         .visual-editor-container h1 { font-size: 2.25rem; font-weight: 800; margin-bottom: 1rem; color: #0f172a; }
         .visual-editor-container h2 { font-size: 1.875rem; font-weight: 700; margin-top: 2rem; margin-bottom: 0.75rem; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; }
         .visual-editor-container h3 { font-size: 1.5rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.5rem; color: #334155; }
@@ -31,22 +30,12 @@
         .visual-editor-container ul { list-style-type: disc; margin: 1rem 0 1rem 2rem; }
         .visual-editor-container ol { list-style-type: decimal; margin: 1rem 0 1rem 2rem; }
         .visual-editor-container li { margin-bottom: 0.25rem; }
-        .visual-editor-container table { 
-            border-collapse: collapse; 
-            width: 100%; 
-            margin: 1.5rem 0; 
-            border: 1px solid #cbd5e1; 
-        }
-        .visual-editor-container th, .visual-editor-container td { 
-            border: 1px solid #cbd5e1; 
-            padding: 12px; 
-            text-align: left; 
-        }
+        .visual-editor-container table { border-collapse: collapse; width: 100%; margin: 1.5rem 0; border: 1px solid #cbd5e1; }
+        .visual-editor-container th, .visual-editor-container td { border: 1px solid #cbd5e1; padding: 12px; text-align: left; }
         .visual-editor-container th { background: #f8fafc; font-weight: 700; }
         .visual-editor-container strong { font-weight: 700; color: #0f172a; }
         .visual-editor-container a { color: #2563eb; text-decoration: underline; }
         
-        /* Placeholder styling */
         .visual-editor-container:empty:before {
             content: attr(data-placeholder);
             color: #94a3b8;
@@ -68,7 +57,6 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
-    <!-- Crucial: This tag was missing, causing the white screen -->
     <script type="module" src="./index.tsx"></script>
 </body>
 </html>
