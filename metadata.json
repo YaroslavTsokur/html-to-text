@@ -1,0 +1,5 @@
+{
+  "name": "DocToCleanHTML (Pixana)",
+  "description": "Local-first utility for converting messy HTML into clean semantic markup. Isolated sessions for local network use.",
+  "requestFramePermissions": []
+}
