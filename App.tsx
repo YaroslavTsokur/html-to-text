@@ -15,6 +15,7 @@ interface SEOStats {
   headingList: HeadingItem[];
   wordCount: number;
   charCount: number;
+  charCountNoSpaces: number;
   headings: { [key: string]: number };
   images: { total: number; missingAlt: number };
   links: number;
@@ -88,12 +89,14 @@ const App: React.FC = () => {
 
     doc.querySelectorAll('h1, h2, h3, h4').forEach(h => {
       const tag = h.tagName.toLowerCase();
-      headings[tag]++;
-      headingList.push({
-        tag: tag.toUpperCase(),
-        text: h.textContent || '',
-        level: parseInt(tag.substring(1))
-      });
+      if (headings.hasOwnProperty(tag)) {
+        headings[tag]++;
+        headingList.push({
+          tag: tag.toUpperCase(),
+          text: (h.textContent || '').trim().replace(/[\r\n\t]+/g, ' '),
+          level: parseInt(tag.substring(1))
+        });
+      }
     });
 
     const imgs = doc.querySelectorAll('img');
@@ -101,25 +104,65 @@ const App: React.FC = () => {
     imgs.forEach(img => { if (!img.hasAttribute('alt') || !img.getAttribute('alt')) missingAlt++; });
 
     return {
-      title: h1,
+      title: h1.trim().replace(/[\r\n\t]+/g, ' '),
       headingList,
       wordCount: textContent.split(/\s+/).filter(w => w.length > 0).length,
       charCount: textContent.length,
+      charCountNoSpaces: textContent.replace(/\s/g, '').length,
       headings,
       images: { total: imgs.length, missingAlt },
       links: doc.querySelectorAll('a').length
     };
   }, [currentHtml]);
 
-  const copyToClipboard = async () => {
+  const exportToExcel = () => {
     if (!currentHtml) return;
-    const textToCopy = rightPanelMode === 'html' ? currentHtml : JSON.stringify(seoData, null, 2);
-    try {
-      await navigator.clipboard.writeText(textToCopy);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
-      console.error("Clipboard copy failed:", err);
+
+    // Create CSV content
+    let csv = "\uFEFF"; // UTF-8 BOM for Excel
+    csv += "Metric;Value\n";
+    csv += `Main Title (H1);"${seoData.title}"\n`;
+    csv += `Word Count;${seoData.wordCount}\n`;
+    csv += `Char Count (with spaces);${seoData.charCount}\n`;
+    csv += `Char Count (no spaces);${seoData.charCountNoSpaces}\n`;
+    csv += `Total Links;${seoData.links}\n`;
+    csv += `Total Images;${seoData.images.total}\n`;
+    csv += `Images Missing Alt;${seoData.images.missingAlt}\n`;
+    csv += `H1 Count;${seoData.headings.h1}\n`;
+    csv += `H2 Count;${seoData.headings.h2}\n`;
+    csv += `H3 Count;${seoData.headings.h3}\n`;
+    csv += `H4 Count;${seoData.headings.h4}\n`;
+    csv += "\n";
+    csv += "Heading Tag;Heading Text\n";
+    
+    seoData.headingList.forEach(h => {
+      csv += `${h.tag};"${h.text.replace(/"/g, '""')}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `seo_analysis_${new Date().getTime()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handlePrimaryAction = async () => {
+    if (!currentHtml) return;
+    
+    if (rightPanelMode === 'html') {
+      try {
+        await navigator.clipboard.writeText(currentHtml);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch (err) {
+        console.error("Clipboard copy failed:", err);
+      }
+    } else {
+      exportToExcel();
     }
   };
 
@@ -163,13 +206,22 @@ const App: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <button 
-            onClick={copyToClipboard}
+            onClick={handlePrimaryAction}
             disabled={!currentHtml}
             className={`flex items-center gap-2 px-6 py-2 text-sm font-bold rounded-lg transition-all border shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
               isCopied ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-slate-900 border-slate-900 text-white hover:bg-slate-800'
             }`}
           >
-            {isCopied ? 'Copied!' : `Copy ${rightPanelMode.toUpperCase()}`}
+            {rightPanelMode === 'html' ? (
+              isCopied ? 'Copied!' : 'Copy HTML'
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export SEO (Excel)
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -296,14 +348,18 @@ const App: React.FC = () => {
                   </div>
                 </section>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
-                    <div className="text-2xl font-black text-white">{seoData.wordCount}</div>
-                    <div className="text-[9px] text-slate-500 font-bold uppercase mt-1">Words</div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
+                    <div className="text-xl font-black text-white">{seoData.wordCount}</div>
+                    <div className="text-[8px] text-slate-500 font-bold uppercase mt-1">Words</div>
                   </div>
-                  <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
-                    <div className="text-2xl font-black text-white">{seoData.charCount}</div>
-                    <div className="text-[9px] text-slate-500 font-bold uppercase mt-1">Chars</div>
+                  <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
+                    <div className="text-xl font-black text-white">{seoData.charCount}</div>
+                    <div className="text-[8px] text-slate-500 font-bold uppercase mt-1">With Spc</div>
+                  </div>
+                  <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
+                    <div className="text-xl font-black text-white">{seoData.charCountNoSpaces}</div>
+                    <div className="text-[8px] text-slate-500 font-bold uppercase mt-1">No Spc</div>
                   </div>
                 </div>
 
