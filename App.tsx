@@ -8,7 +8,7 @@ const App: React.FC = () => {
   const visualEditorRef = useRef<HTMLDivElement>(null);
   const isInternalChange = useRef(false);
 
-  // Synchronize visual editor when HTML state is updated via code editor or sanitize button
+  // Synchronize visual editor when HTML state is updated via code editor or paste
   useEffect(() => {
     if (isInternalChange.current) {
       isInternalChange.current = false;
@@ -33,15 +33,6 @@ const App: React.FC = () => {
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setCurrentHtml(e.target.value);
-  };
-
-  const handleSanitize = () => {
-    const sanitized = cleanHTML(currentHtml);
-    setCurrentHtml(sanitized);
-    // Explicitly update visual editor to reflect cleaned state
-    if (visualEditorRef.current) {
-      visualEditorRef.current.innerHTML = sanitized;
-    }
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -94,23 +85,12 @@ const App: React.FC = () => {
       <Header />
       
       <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm z-10">
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={handleSanitize}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold hover:bg-slate-800 transition-all shadow-md active:scale-95"
-            title="Clean formatting and attributes"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            Clean Markup
-          </button>
-          <div className="h-4 w-px bg-slate-200 mx-2"></div>
+        <div className="flex items-center gap-3">
           <button 
             onClick={handleClear}
-            className="px-3 py-2 text-slate-400 hover:text-red-500 text-sm font-bold transition-colors"
+            className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50 hover:text-red-500 transition-all active:scale-95 shadow-sm"
           >
-            Clear
+            Clear Editor
           </button>
         </div>
 
@@ -119,7 +99,7 @@ const App: React.FC = () => {
             onClick={copyToClipboard}
             disabled={!currentHtml}
             className={`flex items-center gap-2 px-6 py-2 text-sm font-bold rounded-lg transition-all border shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-              isCopied ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              isCopied ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-slate-900 border-slate-900 text-white hover:bg-slate-800'
             }`}
           >
             {isCopied ? (
@@ -132,7 +112,7 @@ const App: React.FC = () => {
             ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                 </svg>
                 Copy HTML
               </>
@@ -184,7 +164,7 @@ const App: React.FC = () => {
           <span>Mode: Semantic Purifier</span>
         </div>
         <div className="hidden sm:block">
-          Optimized for GitHub Pages
+          Auto-Cleaning on Paste
         </div>
       </footer>
     </div>
